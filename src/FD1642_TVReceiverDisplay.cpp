@@ -174,14 +174,7 @@ void FD1642_TVReceiverDisplay::showClock(uint8_t hours, uint8_t minutes) {
 }
 
 void FD1642_TVReceiverDisplay::showString(const char* str) {
-  uint8_t len = strlen(str);
-  for (int i = 0; i < 4; i++) {
-    if (i < len) {
-      _rawFrames[i] = getCharPattern(str[i]);
-    } else {
-      _rawFrames[i] = 0UL;
-    }
-  }
+  renderStringToFrames(str, _rawFrames, 4);
 }
 
 void FD1642_TVReceiverDisplay::setChar(uint8_t index, char c) {
@@ -194,19 +187,101 @@ void FD1642_TVReceiverDisplay::scrollText(const char* text, uint16_t speedMs) {
   uint8_t len = strlen(text);
   if (len == 0) return;
 
-  for (int i = 0; i < len; i++) {
-    char buf[5] = {' ', ' ', ' ', ' ', '\0'};
-    for (int j = 0; j < 4; j++) {
-      if (i + j < len) {
-        buf[j] = text[i + j];
+  // We need to scroll through the expanded string.
+  // To handle wide chars properly in a scrolling window, we pre-expand
+  // the entire string into a digit-position array.
+  // Max expansion: each char could be 2 digits wide, so worst case 2*len.
+  // We use dynamic-ish approach with a reasonable cap.
+  uint8_t expandedLen = 0;
+  uint32_t expanded[128]; // Support up to ~64 char strings (128 digit positions)
+  
+  for (uint8_t i = 0; i < len && expandedLen < 126; i++) {
+    char c = text[i];
+    char upper = c;
+    if (upper >= 'a' && upper <= 'z') upper = upper - 'a' + 'A';
+    
+    if (isWideChar(upper)) {
+      uint32_t left, right;
+      getWideCharPatterns(upper, left, right);
+      expanded[expandedLen++] = left;
+      expanded[expandedLen++] = right;
+    } else {
+      expanded[expandedLen++] = getCharPattern(c);
+    }
+  }
+
+  // Now scroll through the expanded array, showing 4 positions at a time
+  for (uint8_t i = 0; i < expandedLen; i++) {
+    for (uint8_t d = 0; d < 4; d++) {
+      if (i + d < expandedLen) {
+        _rawFrames[d] = expanded[i + d];
+      } else {
+        _rawFrames[d] = 0UL;
       }
     }
-    showString(buf);
     unsigned long stepStart = millis();
     while (millis() - stepStart < speedMs) {
       refresh();
     }
   }
+}
+
+// -------------------------------------------------------------------
+// Wide Character Support (M, W span 2 digit positions)
+// -------------------------------------------------------------------
+bool FD1642_TVReceiverDisplay::isWideChar(char c) {
+  return (c == 'M' || c == 'W' || c == 'm' || c == 'w');
+}
+
+void FD1642_TVReceiverDisplay::getWideCharPatterns(char c, uint32_t &left, uint32_t &right) {
+  if (c == 'M' || c == 'm') {
+    // M across 2 digits:
+    //  _   _
+    // |_  _|
+    // |    |
+    left  = mapStandardToRaw(S_A | S_F | S_E | S_G); // Top + Left verticals + Middle
+    right = mapStandardToRaw(S_A | S_B | S_C | S_G); // Top + Right verticals + Middle
+  } else { // W or w
+    // W across 2 digits (inverted M):
+    // |    |
+    // |_  _|
+    //  _   _
+    left  = mapStandardToRaw(S_F | S_E | S_D | S_G); // Left verticals + Bottom + Middle
+    right = mapStandardToRaw(S_B | S_C | S_D | S_G); // Right verticals + Bottom + Middle
+  }
+}
+
+uint8_t FD1642_TVReceiverDisplay::renderStringToFrames(const char* str, uint32_t* frames, uint8_t maxDigits) {
+  uint8_t len = strlen(str);
+  uint8_t digitPos = 0;
+
+  // Clear all frames first
+  for (uint8_t i = 0; i < maxDigits; i++) {
+    frames[i] = 0UL;
+  }
+
+  for (uint8_t i = 0; i < len && digitPos < maxDigits; i++) {
+    char c = str[i];
+    char upper = c;
+    if (upper >= 'a' && upper <= 'z') upper = upper - 'a' + 'A';
+
+    if (isWideChar(upper) && (digitPos + 1) < maxDigits) {
+      // Wide character: takes 2 digit positions
+      uint32_t left, right;
+      getWideCharPatterns(upper, left, right);
+      frames[digitPos]     = left;
+      frames[digitPos + 1] = right;
+      digitPos += 2;
+    } else if (isWideChar(upper) && (digitPos + 1) >= maxDigits) {
+      // Not enough room for wide char, show single-digit fallback
+      frames[digitPos] = getCharPattern(c);
+      digitPos++;
+    } else {
+      frames[digitPos] = getCharPattern(c);
+      digitPos++;
+    }
+  }
+  return digitPos;
 }
 
 // -------------------------------------------------------------------

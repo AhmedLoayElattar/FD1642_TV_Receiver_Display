@@ -161,6 +161,9 @@ private:
   void send18BitData(uint32_t data);
   uint32_t mapStandardToRaw(uint8_t standardMask);
   uint32_t getCharPattern(char c);
+  bool isWideChar(char c);
+  void getWideCharPatterns(char c, uint32_t &left, uint32_t &right);
+  uint8_t renderStringToFrames(const char* str, uint32_t* frames, uint8_t maxDigits);
 };
 
 // Alias for backwards compatibility
