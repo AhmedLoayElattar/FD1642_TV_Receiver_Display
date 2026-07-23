@@ -1,0 +1,30 @@
+#######################################
+# Syntax Highlighting For FD1642_TVReceiverDisplay
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+FD1642_TVReceiverDisplay	KEYWORD1
+TVReceiverDisplay	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin	KEYWORD2
+showDigits	KEYWORD2
+setDigit	KEYWORD2
+setDigit1	KEYWORD2
+setDigit2	KEYWORD2
+setDigit3	KEYWORD2
+setDigit4	KEYWORD2
+showNumber	KEYWORD2
+showClock	KEYWORD2
+clear	KEYWORD2
+refresh	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
