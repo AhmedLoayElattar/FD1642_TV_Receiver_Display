@@ -53,6 +53,8 @@ static const uint8_t ASCII_FONT[128] = {
 FD1642_TVReceiverDisplay::FD1642_TVReceiverDisplay(uint8_t clkPin, uint8_t dataPin) {
   _clkPin = clkPin;
   _dataPin = dataPin;
+  _invertX = false;
+  _invertY = false;
   for (int i = 0; i < 4; i++) {
     _rawFrames[i] = DIGIT_SEGMENTS[0];
   }
@@ -100,9 +102,71 @@ void FD1642_TVReceiverDisplay::send18BitData(uint32_t data) {
 }
 
 // -------------------------------------------------------------------
+// Orientation & Inversion Transformations
+// -------------------------------------------------------------------
+void FD1642_TVReceiverDisplay::setInvertX(bool invert) {
+  _invertX = invert;
+}
+
+void FD1642_TVReceiverDisplay::setInvertY(bool invert) {
+  _invertY = invert;
+}
+
+void FD1642_TVReceiverDisplay::setRotation(uint16_t angle) {
+  if (angle == 180) {
+    _invertX = true;
+    _invertY = true;
+  } else {
+    _invertX = false;
+    _invertY = false;
+  }
+}
+
+uint8_t FD1642_TVReceiverDisplay::transformStandardMask(uint8_t standardMask) {
+  uint8_t result = 0;
+  bool a = (standardMask & S_A);
+  bool b = (standardMask & S_B);
+  bool c = (standardMask & S_C);
+  bool d = (standardMask & S_D);
+  bool e = (standardMask & S_E);
+  bool f = (standardMask & S_F);
+  bool g = (standardMask & S_G);
+
+  bool new_a = a, new_b = b, new_c = c, new_d = d, new_e = e, new_f = f, new_g = g;
+
+  if (_invertY) {
+    new_a = d;
+    new_d = a;
+    new_b = c;
+    new_c = b;
+    new_f = e;
+    new_e = f;
+  }
+
+  if (_invertX) {
+    bool temp_b = new_b, temp_c = new_c;
+    new_b = new_f;
+    new_f = temp_b;
+    new_c = new_e;
+    new_e = temp_c;
+  }
+
+  if (new_a) result |= S_A;
+  if (new_b) result |= S_B;
+  if (new_c) result |= S_C;
+  if (new_d) result |= S_D;
+  if (new_e) result |= S_E;
+  if (new_f) result |= S_F;
+  if (new_g) result |= S_G;
+
+  return result;
+}
+
+// -------------------------------------------------------------------
 // Standard Segment to Raw 18-bit Mapping
 // -------------------------------------------------------------------
 uint32_t FD1642_TVReceiverDisplay::mapStandardToRaw(uint8_t standardMask) {
+  standardMask = transformStandardMask(standardMask);
   uint32_t raw = 0;
   if (standardMask & S_A) raw |= SEG_A;
   if (standardMask & S_B) raw |= SEG_B;
@@ -405,9 +469,10 @@ void FD1642_TVReceiverDisplay::refresh() {
   uint32_t baseGrids = 0x7FFUL;
 
   for (int i = 0; i < 4; i++) {
+    uint8_t srcIndex = _invertX ? (3 - i) : i;
     uint8_t gridBit = DIGIT_GRIDS[i];
     uint32_t gridMask = baseGrids & ~(1UL << gridBit);
-    uint32_t frame = _rawFrames[i] | gridMask;
+    uint32_t frame = _rawFrames[srcIndex] | gridMask;
     send18BitData(frame);
     delayMicroseconds(1500);
   }

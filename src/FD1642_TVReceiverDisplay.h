@@ -141,6 +141,19 @@ public:
   void setCustomChar(char c, uint8_t segmentMask);
 
   // -------------------------------------------------------------------
+  // ORIENTATION & AXIS INVERSION (ROTATION / FLIP)
+  // -------------------------------------------------------------------
+
+  /** Invert X-axis (Horizontal digit order & segment flip) */
+  void setInvertX(bool invert);
+
+  /** Invert Y-axis (Vertical segment flip) */
+  void setInvertY(bool invert);
+
+  /** Set rotation in degrees (0 or 180 degrees) */
+  void setRotation(uint16_t angle);
+
+  // -------------------------------------------------------------------
   // SYSTEM UTILITIES
   // -------------------------------------------------------------------
 
@@ -153,12 +166,15 @@ public:
 private:
   uint8_t _clkPin;
   uint8_t _dataPin;
+  bool _invertX;
+  bool _invertY;
   uint32_t _rawFrames[4]; // Raw 18-bit segment frames for 4 digits
   uint8_t _customFont[128]; // User-overridden characters
 
   void startCondition();
   void stopCondition();
   void send18BitData(uint32_t data);
+  uint8_t transformStandardMask(uint8_t mask);
   uint32_t mapStandardToRaw(uint8_t standardMask);
   uint32_t getCharPattern(char c);
   bool isWideChar(char c);
