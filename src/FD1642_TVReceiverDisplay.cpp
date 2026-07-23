@@ -44,10 +44,10 @@ static const uint8_t ASCII_FONT[128] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 16-31
   0x00, 0x86, 0x22, 0x76, 0x00, 0x00, 0x00, 0x02, 0x39, 0x0F, 0x00, 0x00, 0x04, 0x40, 0x08, 0x52, // 32-47
   0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x00, 0x00, 0x00, 0x48, 0x00, 0x53, // 48-63
-  0x00, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x75, 0x38, 0x37, 0x54, 0x3F, // 64-79
-  0x73, 0x67, 0x50, 0x6D, 0x78, 0x3E, 0x1C, 0x3E, 0x76, 0x6E, 0x5B, 0x39, 0x00, 0x0F, 0x23, 0x08, // 80-95
-  0x20, 0x5F, 0x7C, 0x58, 0x5E, 0x7B, 0x71, 0x6F, 0x74, 0x04, 0x0E, 0x75, 0x30, 0x54, 0x54, 0x5C, // 96-111
-  0x73, 0x67, 0x50, 0x6D, 0x78, 0x1C, 0x1C, 0x1C, 0x76, 0x6E, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00  // 112-127
+  0x00, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x75, 0x38, 0x79, 0x54, 0x3F, // 64-79 (77='M' -> 0x79 rotated)
+  0x73, 0x67, 0x50, 0x6D, 0x78, 0x3E, 0x1C, 0x4F, 0x76, 0x6E, 0x5B, 0x39, 0x00, 0x0F, 0x23, 0x08, // 80-95 (87='W' -> 0x4F rotated)
+  0x20, 0x5F, 0x7C, 0x58, 0x5E, 0x7B, 0x71, 0x6F, 0x74, 0x04, 0x0E, 0x75, 0x30, 0x79, 0x54, 0x5C, // 96-111 (109='m' -> 0x79 rotated)
+  0x73, 0x67, 0x50, 0x6D, 0x78, 0x1C, 0x1C, 0x4F, 0x76, 0x6E, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00  // 112-127 (119='w' -> 0x4F rotated)
 };
 
 FD1642_TVReceiverDisplay::FD1642_TVReceiverDisplay(uint8_t clkPin, uint8_t dataPin) {
@@ -227,10 +227,89 @@ void FD1642_TVReceiverDisplay::scrollText(const char* text, uint16_t speedMs) {
 }
 
 // -------------------------------------------------------------------
+// -------------------------------------------------------------------
+// Vertical Text Scrolling (Roll Up / Roll Down)
+// -------------------------------------------------------------------
+void FD1642_TVReceiverDisplay::scrollTextVertical(const char* text, uint16_t speedMs, bool rollUp) {
+  uint8_t len = strlen(text);
+  if (len == 0) return;
+
+  uint8_t lineCount = (len + 3) / 4;
+  uint32_t currentFrames[4] = {0, 0, 0, 0};
+  uint32_t nextFrames[4] = {0, 0, 0, 0};
+
+  for (uint8_t line = 0; line < lineCount; line++) {
+    for (uint8_t d = 0; d < 4; d++) {
+      uint8_t charIdx = line * 4 + d;
+      if (charIdx < len) {
+        nextFrames[d] = getCharPattern(text[charIdx]);
+      } else {
+        nextFrames[d] = 0UL;
+      }
+    }
+
+    for (uint8_t step = 1; step <= 3; step++) {
+      for (uint8_t d = 0; d < 4; d++) {
+        if (rollUp) {
+          if (step == 1) {
+            _rawFrames[d] = (currentFrames[d] & (SEG_A | SEG_B | SEG_F | SEG_G));
+          } else if (step == 2) {
+            _rawFrames[d] = (currentFrames[d] & SEG_A) | (nextFrames[d] & (SEG_D | SEG_E | SEG_C | SEG_G));
+          } else {
+            _rawFrames[d] = nextFrames[d];
+          }
+        } else {
+          if (step == 1) {
+            _rawFrames[d] = (currentFrames[d] & (SEG_D | SEG_E | SEG_C | SEG_G));
+          } else if (step == 2) {
+            _rawFrames[d] = (currentFrames[d] & SEG_D) | (nextFrames[d] & (SEG_A | SEG_B | SEG_F | SEG_G));
+          } else {
+            _rawFrames[d] = nextFrames[d];
+          }
+        }
+      }
+
+      unsigned long stepStart = millis();
+      while (millis() - stepStart < speedMs) {
+        refresh();
+      }
+    }
+
+    for (uint8_t d = 0; d < 4; d++) {
+      currentFrames[d] = nextFrames[d];
+      _rawFrames[d] = nextFrames[d];
+    }
+    unsigned long holdStart = millis();
+    while (millis() - holdStart < speedMs * 4) {
+      refresh();
+    }
+  }
+
+  for (uint8_t step = 1; step <= 3; step++) {
+    for (uint8_t d = 0; d < 4; d++) {
+      if (rollUp) {
+        if (step == 1) _rawFrames[d] = (currentFrames[d] & (SEG_A | SEG_B | SEG_F | SEG_G));
+        else if (step == 2) _rawFrames[d] = (currentFrames[d] & SEG_A);
+        else _rawFrames[d] = 0UL;
+      } else {
+        if (step == 1) _rawFrames[d] = (currentFrames[d] & (SEG_D | SEG_E | SEG_C | SEG_G));
+        else if (step == 2) _rawFrames[d] = (currentFrames[d] & SEG_D);
+        else _rawFrames[d] = 0UL;
+      }
+    }
+    unsigned long stepStart = millis();
+    while (millis() - stepStart < speedMs) {
+      refresh();
+    }
+  }
+}
+
+// -------------------------------------------------------------------
 // Wide Character Support (M, W span 2 digit positions)
 // -------------------------------------------------------------------
 bool FD1642_TVReceiverDisplay::isWideChar(char c) {
-  return (c == 'M' || c == 'W' || c == 'm' || c == 'w');
+  // Use single-digit rotated 90-degree M and W for clean horizontal alignment
+  return false;
 }
 
 void FD1642_TVReceiverDisplay::getWideCharPatterns(char c, uint32_t &left, uint32_t &right) {
