@@ -75,15 +75,6 @@ public:
    */
   void scrollText(const char* text, uint16_t speedMs = 250);
 
-  /**
-   * @brief Scroll text vertically (roll up or down) line by line across the digits
-   * 
-   * @param text String to scroll vertically (shows 4 chars per line/slide)
-   * @param speedMs Delay per transition step in milliseconds (default: 150ms)
-   * @param rollUp If true, scrolls upward; if false, scrolls downward (default: true)
-   */
-  void scrollTextVertical(const char* text, uint16_t speedMs = 150, bool rollUp = true);
-
   // -------------------------------------------------------------------
   // ANIMATIONS & LOADING SCREENS
   // -------------------------------------------------------------------
