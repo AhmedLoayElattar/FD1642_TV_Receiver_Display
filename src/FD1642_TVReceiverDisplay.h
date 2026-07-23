@@ -119,6 +119,28 @@ public:
   void animFillWipe(uint16_t speedMs = 150);
 
   // -------------------------------------------------------------------
+  // CUSTOM CHARACTERS & DIRECT SEGMENT CONTROL
+  // -------------------------------------------------------------------
+
+  /**
+   * @brief Directly set the segments of a digit using standard 7-segment encoding.
+   * Standard encoding: 0b0GFEDCBA (Bit 0=A, Bit 1=B, ..., Bit 6=G)
+   * 
+   * @param index Digit index (0 to 3)
+   * @param segmentMask Standard 7-segment bitmask (e.g. 0b01110111 for 'A')
+   */
+  void setSegments(uint8_t index, uint8_t segmentMask);
+
+  /**
+   * @brief Override or define a new standard 7-segment pattern for an ASCII character.
+   * This affects showString, setChar, and scrollText.
+   * 
+   * @param c The ASCII character to override (e.g. 'M', 'W')
+   * @param segmentMask Standard 7-segment bitmask (0b0GFEDCBA)
+   */
+  void setCustomChar(char c, uint8_t segmentMask);
+
+  // -------------------------------------------------------------------
   // SYSTEM UTILITIES
   // -------------------------------------------------------------------
 
@@ -132,10 +154,12 @@ private:
   uint8_t _clkPin;
   uint8_t _dataPin;
   uint32_t _rawFrames[4]; // Raw 18-bit segment frames for 4 digits
+  uint8_t _customFont[128]; // User-overridden characters
 
   void startCondition();
   void stopCondition();
   void send18BitData(uint32_t data);
+  uint32_t mapStandardToRaw(uint8_t standardMask);
   uint32_t getCharPattern(char c);
 };
 

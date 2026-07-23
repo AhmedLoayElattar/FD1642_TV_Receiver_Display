@@ -3,6 +3,7 @@
 */
 
 #include "FD1642_TVReceiverDisplay.h"
+#include <string.h>
 
 // Segment Bit Definitions (Bits 11..17, Active-HIGH)
 #define SEG_A (1UL << 11)
@@ -12,6 +13,15 @@
 #define SEG_E (1UL << 15)
 #define SEG_F (1UL << 16)
 #define SEG_G (1UL << 17)
+
+// Standard 7-Segment Bit Positions (0b0GFEDCBA)
+#define S_A 0x01
+#define S_B 0x02
+#define S_C 0x04
+#define S_D 0x08
+#define S_E 0x10
+#define S_F 0x20
+#define S_G 0x40
 
 static const uint32_t DIGIT_SEGMENTS[10] = {
   SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F,         // 0
@@ -29,12 +39,24 @@ static const uint32_t DIGIT_SEGMENTS[10] = {
 // Mapped Active-LOW Grids: Digit 1 = Bit 4, Digit 2 = Bit 3, Digit 3 = Bit 2, Digit 4 = Bit 1
 static const uint8_t DIGIT_GRIDS[4] = {4, 3, 2, 1};
 
+static const uint8_t ASCII_FONT[128] = {
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 0-15
+  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 16-31
+  0x00, 0x86, 0x22, 0x76, 0x00, 0x00, 0x00, 0x02, 0x39, 0x0F, 0x00, 0x00, 0x04, 0x40, 0x08, 0x52, // 32-47
+  0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x00, 0x00, 0x00, 0x48, 0x00, 0x53, // 48-63
+  0x00, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x75, 0x38, 0x37, 0x54, 0x3F, // 64-79
+  0x73, 0x67, 0x50, 0x6D, 0x78, 0x3E, 0x1C, 0x3E, 0x76, 0x6E, 0x5B, 0x39, 0x00, 0x0F, 0x23, 0x08, // 80-95
+  0x20, 0x5F, 0x7C, 0x58, 0x5E, 0x7B, 0x71, 0x6F, 0x74, 0x04, 0x0E, 0x75, 0x30, 0x54, 0x54, 0x5C, // 96-111
+  0x73, 0x67, 0x50, 0x6D, 0x78, 0x1C, 0x1C, 0x1C, 0x76, 0x6E, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00  // 112-127
+};
+
 FD1642_TVReceiverDisplay::FD1642_TVReceiverDisplay(uint8_t clkPin, uint8_t dataPin) {
   _clkPin = clkPin;
   _dataPin = dataPin;
   for (int i = 0; i < 4; i++) {
     _rawFrames[i] = DIGIT_SEGMENTS[0];
   }
+  memset(_customFont, 0xFF, sizeof(_customFont));
 }
 
 void FD1642_TVReceiverDisplay::begin() {
@@ -78,51 +100,41 @@ void FD1642_TVReceiverDisplay::send18BitData(uint32_t data) {
 }
 
 // -------------------------------------------------------------------
+// Standard Segment to Raw 18-bit Mapping
+// -------------------------------------------------------------------
+uint32_t FD1642_TVReceiverDisplay::mapStandardToRaw(uint8_t standardMask) {
+  uint32_t raw = 0;
+  if (standardMask & S_A) raw |= SEG_A;
+  if (standardMask & S_B) raw |= SEG_B;
+  if (standardMask & S_C) raw |= SEG_C;
+  if (standardMask & S_D) raw |= SEG_D;
+  if (standardMask & S_E) raw |= SEG_E;
+  if (standardMask & S_F) raw |= SEG_F;
+  if (standardMask & S_G) raw |= SEG_G;
+  return raw;
+}
+
+// -------------------------------------------------------------------
 // Complete Alphanumeric & ASCII Symbol Pattern Generator (A-Z, 0-9)
 // -------------------------------------------------------------------
 uint32_t FD1642_TVReceiverDisplay::getCharPattern(char c) {
-  if (c >= '0' && c <= '9') {
-    return DIGIT_SEGMENTS[c - '0'];
+  if (c < 0 || c > 127) return 0UL;
+  uint8_t mask = _customFont[(uint8_t)c];
+  if (mask == 0xFF) {
+    mask = ASCII_FONT[(uint8_t)c];
   }
+  return mapStandardToRaw(mask);
+}
 
-  // Convert lowercase to uppercase for uniform matching
-  if (c >= 'a' && c <= 'z') {
-    c = c - 'a' + 'A';
+void FD1642_TVReceiverDisplay::setSegments(uint8_t index, uint8_t segmentMask) {
+  if (index < 4) {
+    _rawFrames[index] = mapStandardToRaw(segmentMask);
   }
+}
 
-  switch (c) {
-    case 'A': return SEG_A | SEG_B | SEG_C | SEG_E | SEG_F | SEG_G;
-    case 'B': return SEG_C | SEG_D | SEG_E | SEG_F | SEG_G; // 'b'
-    case 'C': return SEG_A | SEG_D | SEG_E | SEG_F;
-    case 'D': return SEG_B | SEG_C | SEG_D | SEG_E | SEG_G; // 'd'
-    case 'E': return SEG_A | SEG_D | SEG_E | SEG_F | SEG_G;
-    case 'F': return SEG_A | SEG_E | SEG_F | SEG_G;
-    case 'G': return SEG_A | SEG_B | SEG_C | SEG_D | SEG_F | SEG_G;
-    case 'H': return SEG_B | SEG_C | SEG_E | SEG_F | SEG_G;
-    case 'I': return SEG_B | SEG_C;
-    case 'J': return SEG_B | SEG_C | SEG_D | SEG_E;
-    case 'K': return SEG_A | SEG_C | SEG_E | SEG_F | SEG_G;
-    case 'L': return SEG_D | SEG_E | SEG_F;
-    case 'M': return SEG_A | SEG_C | SEG_E;
-    case 'N': return SEG_C | SEG_E | SEG_G; // 'n'
-    case 'O': return SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F;
-    case 'P': return SEG_A | SEG_B | SEG_E | SEG_F | SEG_G;
-    case 'Q': return SEG_A | SEG_B | SEG_C | SEG_F | SEG_G;
-    case 'R': return SEG_E | SEG_G; // 'r'
-    case 'S': return SEG_A | SEG_C | SEG_D | SEG_F | SEG_G;
-    case 'T': return SEG_D | SEG_E | SEG_F | SEG_G; // 't'
-    case 'U': return SEG_B | SEG_C | SEG_D | SEG_E | SEG_F;
-    case 'V': return SEG_C | SEG_D | SEG_E; // 'v'
-    case 'W': return SEG_B | SEG_C | SEG_D | SEG_E | SEG_F; // 'W' (rendered as U-shaped 7-segment font)
-    case 'X': return SEG_B | SEG_C | SEG_E | SEG_F | SEG_G;
-    case 'Y': return SEG_B | SEG_C | SEG_D | SEG_F | SEG_G;
-    case 'Z': return SEG_A | SEG_B | SEG_D | SEG_E | SEG_G;
-    case '-': return SEG_G;
-    case '_': return SEG_D;
-    case '=': return SEG_D | SEG_G;
-    case '[': return SEG_A | SEG_D | SEG_E | SEG_F;
-    case ']': return SEG_A | SEG_B | SEG_C | SEG_D;
-    case ' ': default: return 0UL;
+void FD1642_TVReceiverDisplay::setCustomChar(char c, uint8_t segmentMask) {
+  if (c >= 0 && c < 128) {
+    _customFont[(uint8_t)c] = segmentMask;
   }
 }
 
