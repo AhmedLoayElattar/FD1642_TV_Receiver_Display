@@ -76,6 +76,17 @@ public:
   void scrollText(const char* text, uint16_t speedMs = 250);
 
   // -------------------------------------------------------------------
+  // DIGIT ORDER REVERSAL (TOGGLE LEFT-TO-RIGHT / RIGHT-TO-LEFT)
+  // -------------------------------------------------------------------
+
+  /**
+   * @brief Toggle digit ordering (e.g. 1234 vs 4321) without segment mirroring
+   * 
+   * @param reverse If true, reverses digit order (Leftmost <-> Rightmost)
+   */
+  void setReverseDigits(bool reverse);
+
+  // -------------------------------------------------------------------
   // ANIMATIONS & LOADING SCREENS
   // -------------------------------------------------------------------
 
@@ -141,19 +152,6 @@ public:
   void setCustomChar(char c, uint8_t segmentMask);
 
   // -------------------------------------------------------------------
-  // ORIENTATION & AXIS INVERSION (ROTATION / FLIP)
-  // -------------------------------------------------------------------
-
-  /** Invert X-axis (Horizontal digit order & segment flip) */
-  void setInvertX(bool invert);
-
-  /** Invert Y-axis (Vertical segment flip) */
-  void setInvertY(bool invert);
-
-  /** Set rotation in degrees (0 or 180 degrees) */
-  void setRotation(uint16_t angle);
-
-  // -------------------------------------------------------------------
   // SYSTEM UTILITIES
   // -------------------------------------------------------------------
 
@@ -166,15 +164,13 @@ public:
 private:
   uint8_t _clkPin;
   uint8_t _dataPin;
-  bool _invertX;
-  bool _invertY;
+  bool _reverseDigits;
   uint32_t _rawFrames[4]; // Raw 18-bit segment frames for 4 digits
   uint8_t _customFont[128]; // User-overridden characters
 
   void startCondition();
   void stopCondition();
   void send18BitData(uint32_t data);
-  uint8_t transformStandardMask(uint8_t mask);
   uint32_t mapStandardToRaw(uint8_t standardMask);
   uint32_t getCharPattern(char c);
   bool isWideChar(char c);

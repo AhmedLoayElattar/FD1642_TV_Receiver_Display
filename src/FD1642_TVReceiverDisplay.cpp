@@ -44,17 +44,16 @@ static const uint8_t ASCII_FONT[128] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 16-31
   0x00, 0x86, 0x22, 0x76, 0x00, 0x00, 0x00, 0x02, 0x39, 0x0F, 0x00, 0x00, 0x04, 0x40, 0x08, 0x52, // 32-47
   0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x00, 0x00, 0x00, 0x48, 0x00, 0x53, // 48-63
-  0x00, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x75, 0x38, 0x79, 0x54, 0x3F, // 64-79 (77='M' -> 0x79 rotated)
-  0x73, 0x67, 0x50, 0x6D, 0x78, 0x3E, 0x1C, 0x4F, 0x76, 0x6E, 0x5B, 0x39, 0x00, 0x0F, 0x23, 0x08, // 80-95 (87='W' -> 0x4F rotated)
-  0x20, 0x5F, 0x7C, 0x58, 0x5E, 0x7B, 0x71, 0x6F, 0x74, 0x04, 0x0E, 0x75, 0x30, 0x79, 0x54, 0x5C, // 96-111 (109='m' -> 0x79 rotated)
-  0x73, 0x67, 0x50, 0x6D, 0x78, 0x1C, 0x1C, 0x4F, 0x76, 0x6E, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00  // 112-127 (119='w' -> 0x4F rotated)
+  0x00, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71, 0x3D, 0x76, 0x06, 0x1E, 0x75, 0x38, 0x79, 0x54, 0x3F, // 64-79 ('M'=0x79 rotated)
+  0x73, 0x67, 0x50, 0x6D, 0x78, 0x3E, 0x1C, 0x4F, 0x76, 0x6E, 0x5B, 0x39, 0x00, 0x0F, 0x23, 0x08, // 80-95 ('W'=0x4F rotated)
+  0x20, 0x5F, 0x7C, 0x58, 0x5E, 0x7B, 0x71, 0x6F, 0x74, 0x04, 0x0E, 0x75, 0x30, 0x79, 0x54, 0x5C, // 96-111 ('m'=0x79 rotated)
+  0x73, 0x67, 0x50, 0x6D, 0x78, 0x1C, 0x1C, 0x4F, 0x76, 0x6E, 0x5B, 0x00, 0x00, 0x00, 0x00, 0x00  // 112-127 ('w'=0x4F rotated)
 };
 
 FD1642_TVReceiverDisplay::FD1642_TVReceiverDisplay(uint8_t clkPin, uint8_t dataPin) {
   _clkPin = clkPin;
   _dataPin = dataPin;
-  _invertX = false;
-  _invertY = false;
+  _reverseDigits = false;
   for (int i = 0; i < 4; i++) {
     _rawFrames[i] = DIGIT_SEGMENTS[0];
   }
@@ -101,72 +100,14 @@ void FD1642_TVReceiverDisplay::send18BitData(uint32_t data) {
   stopCondition();
 }
 
-// -------------------------------------------------------------------
-// Orientation & Inversion Transformations
-// -------------------------------------------------------------------
-void FD1642_TVReceiverDisplay::setInvertX(bool invert) {
-  _invertX = invert;
-}
-
-void FD1642_TVReceiverDisplay::setInvertY(bool invert) {
-  _invertY = invert;
-}
-
-void FD1642_TVReceiverDisplay::setRotation(uint16_t angle) {
-  if (angle == 180) {
-    _invertX = true;
-    _invertY = true;
-  } else {
-    _invertX = false;
-    _invertY = false;
-  }
-}
-
-uint8_t FD1642_TVReceiverDisplay::transformStandardMask(uint8_t standardMask) {
-  uint8_t result = 0;
-  bool a = (standardMask & S_A);
-  bool b = (standardMask & S_B);
-  bool c = (standardMask & S_C);
-  bool d = (standardMask & S_D);
-  bool e = (standardMask & S_E);
-  bool f = (standardMask & S_F);
-  bool g = (standardMask & S_G);
-
-  bool new_a = a, new_b = b, new_c = c, new_d = d, new_e = e, new_f = f, new_g = g;
-
-  if (_invertY) {
-    new_a = d;
-    new_d = a;
-    new_b = c;
-    new_c = b;
-    new_f = e;
-    new_e = f;
-  }
-
-  if (_invertX) {
-    bool temp_b = new_b, temp_c = new_c;
-    new_b = new_f;
-    new_f = temp_b;
-    new_c = new_e;
-    new_e = temp_c;
-  }
-
-  if (new_a) result |= S_A;
-  if (new_b) result |= S_B;
-  if (new_c) result |= S_C;
-  if (new_d) result |= S_D;
-  if (new_e) result |= S_E;
-  if (new_f) result |= S_F;
-  if (new_g) result |= S_G;
-
-  return result;
+void FD1642_TVReceiverDisplay::setReverseDigits(bool reverse) {
+  _reverseDigits = reverse;
 }
 
 // -------------------------------------------------------------------
 // Standard Segment to Raw 18-bit Mapping
 // -------------------------------------------------------------------
 uint32_t FD1642_TVReceiverDisplay::mapStandardToRaw(uint8_t standardMask) {
-  standardMask = transformStandardMask(standardMask);
   uint32_t raw = 0;
   if (standardMask & S_A) raw |= SEG_A;
   if (standardMask & S_B) raw |= SEG_B;
@@ -251,13 +192,8 @@ void FD1642_TVReceiverDisplay::scrollText(const char* text, uint16_t speedMs) {
   uint8_t len = strlen(text);
   if (len == 0) return;
 
-  // We need to scroll through the expanded string.
-  // To handle wide chars properly in a scrolling window, we pre-expand
-  // the entire string into a digit-position array.
-  // Max expansion: each char could be 2 digits wide, so worst case 2*len.
-  // We use dynamic-ish approach with a reasonable cap.
   uint8_t expandedLen = 0;
-  uint32_t expanded[128]; // Support up to ~64 char strings (128 digit positions)
+  uint32_t expanded[128];
   
   for (uint8_t i = 0; i < len && expandedLen < 126; i++) {
     char c = text[i];
@@ -274,7 +210,6 @@ void FD1642_TVReceiverDisplay::scrollText(const char* text, uint16_t speedMs) {
     }
   }
 
-  // Now scroll through the expanded array, showing 4 positions at a time
   for (uint8_t i = 0; i < expandedLen; i++) {
     for (uint8_t d = 0; d < 4; d++) {
       if (i + d < expandedLen) {
@@ -290,63 +225,27 @@ void FD1642_TVReceiverDisplay::scrollText(const char* text, uint16_t speedMs) {
   }
 }
 
-
-
-// -------------------------------------------------------------------
-// Wide Character Support (M, W span 2 digit positions)
-// -------------------------------------------------------------------
 bool FD1642_TVReceiverDisplay::isWideChar(char c) {
-  // Use single-digit rotated 90-degree M and W for clean horizontal alignment
   return false;
 }
 
 void FD1642_TVReceiverDisplay::getWideCharPatterns(char c, uint32_t &left, uint32_t &right) {
-  if (c == 'M' || c == 'm') {
-    // M across 2 digits:
-    //  _   _
-    // |_  _|
-    // |    |
-    left  = mapStandardToRaw(S_A | S_F | S_E | S_G); // Top + Left verticals + Middle
-    right = mapStandardToRaw(S_A | S_B | S_C | S_G); // Top + Right verticals + Middle
-  } else { // W or w
-    // W across 2 digits (inverted M):
-    // |    |
-    // |_  _|
-    //  _   _
-    left  = mapStandardToRaw(S_F | S_E | S_D | S_G); // Left verticals + Bottom + Middle
-    right = mapStandardToRaw(S_B | S_C | S_D | S_G); // Right verticals + Bottom + Middle
-  }
+  left = 0;
+  right = 0;
 }
 
 uint8_t FD1642_TVReceiverDisplay::renderStringToFrames(const char* str, uint32_t* frames, uint8_t maxDigits) {
   uint8_t len = strlen(str);
   uint8_t digitPos = 0;
 
-  // Clear all frames first
   for (uint8_t i = 0; i < maxDigits; i++) {
     frames[i] = 0UL;
   }
 
   for (uint8_t i = 0; i < len && digitPos < maxDigits; i++) {
     char c = str[i];
-    char upper = c;
-    if (upper >= 'a' && upper <= 'z') upper = upper - 'a' + 'A';
-
-    if (isWideChar(upper) && (digitPos + 1) < maxDigits) {
-      // Wide character: takes 2 digit positions
-      uint32_t left, right;
-      getWideCharPatterns(upper, left, right);
-      frames[digitPos]     = left;
-      frames[digitPos + 1] = right;
-      digitPos += 2;
-    } else if (isWideChar(upper) && (digitPos + 1) >= maxDigits) {
-      // Not enough room for wide char, show single-digit fallback
-      frames[digitPos] = getCharPattern(c);
-      digitPos++;
-    } else {
-      frames[digitPos] = getCharPattern(c);
-      digitPos++;
-    }
+    frames[digitPos] = getCharPattern(c);
+    digitPos++;
   }
   return digitPos;
 }
@@ -354,8 +253,6 @@ uint8_t FD1642_TVReceiverDisplay::renderStringToFrames(const char* str, uint32_t
 // -------------------------------------------------------------------
 // ANIMATIONS & LOADING SCREENS
 // -------------------------------------------------------------------
-
-// Rotating Spinner Animation (A->B->C->D->E->F clockwise around each digit)
 void FD1642_TVReceiverDisplay::animLoadingSpinner(uint16_t durationMs, uint16_t speedMs) {
   uint32_t spinnerSegs[6] = {SEG_A, SEG_B, SEG_C, SEG_D, SEG_E, SEG_F};
   unsigned long start = millis();
@@ -374,7 +271,6 @@ void FD1642_TVReceiverDisplay::animLoadingSpinner(uint16_t durationMs, uint16_t 
   }
 }
 
-// Chasing Outer Wave Animation
 void FD1642_TVReceiverDisplay::animWave(uint16_t cycles, uint16_t speedMs) {
   struct WaveStep { uint8_t digit; uint32_t seg; };
   WaveStep path[] = {
@@ -398,17 +294,14 @@ void FD1642_TVReceiverDisplay::animWave(uint16_t cycles, uint16_t speedMs) {
   }
 }
 
-// Bouncing Dash Animation
 void FD1642_TVReceiverDisplay::animBounce(uint16_t bounces, uint16_t speedMs) {
   for (uint16_t b = 0; b < bounces; b++) {
-    // Left to Right
     for (int i = 0; i < 4; i++) {
       for (int d = 0; d < 4; d++) _rawFrames[d] = 0UL;
-      _rawFrames[i] = SEG_G; // Dash
+      _rawFrames[i] = SEG_G;
       unsigned long stepStart = millis();
       while (millis() - stepStart < speedMs) refresh();
     }
-    // Right to Left
     for (int i = 2; i > 0; i--) {
       for (int d = 0; d < 4; d++) _rawFrames[d] = 0UL;
       _rawFrames[i] = SEG_G;
@@ -418,7 +311,6 @@ void FD1642_TVReceiverDisplay::animBounce(uint16_t bounces, uint16_t speedMs) {
   }
 }
 
-// Slot Machine Roll Animation
 void FD1642_TVReceiverDisplay::animSlotMachine(uint16_t targetNumber, uint16_t durationMs) {
   unsigned long start = millis();
   while (millis() - start < durationMs) {
@@ -437,17 +329,14 @@ void FD1642_TVReceiverDisplay::animSlotMachine(uint16_t targetNumber, uint16_t d
   }
 }
 
-// Fill and Wipe Animation
 void FD1642_TVReceiverDisplay::animFillWipe(uint16_t speedMs) {
   uint32_t ALL_SEGS = SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G;
   
-  // Fill Left to Right
   for (int i = 0; i < 4; i++) {
     _rawFrames[i] = ALL_SEGS;
     unsigned long stepStart = millis();
     while (millis() - stepStart < speedMs) refresh();
   }
-  // Wipe Left to Right
   for (int i = 0; i < 4; i++) {
     _rawFrames[i] = 0UL;
     unsigned long stepStart = millis();
@@ -462,14 +351,14 @@ void FD1642_TVReceiverDisplay::clear() {
   for (int i = 0; i < 4; i++) {
     _rawFrames[i] = 0UL;
   }
-  send18BitData(0x7FFUL); // Turn off grids
+  send18BitData(0x7FFUL);
 }
 
 void FD1642_TVReceiverDisplay::refresh() {
   uint32_t baseGrids = 0x7FFUL;
 
   for (int i = 0; i < 4; i++) {
-    uint8_t srcIndex = _invertX ? (3 - i) : i;
+    uint8_t srcIndex = _reverseDigits ? (3 - i) : i;
     uint8_t gridBit = DIGIT_GRIDS[i];
     uint32_t gridMask = baseGrids & ~(1UL << gridBit);
     uint32_t frame = _rawFrames[srcIndex] | gridMask;
