@@ -1,7 +1,8 @@
 /*
-  FD1642_TVReceiverDisplay.h - Arduino Library for Salvaged TV Receiver / 
-  Set-Top Box 4-Digit 7-Segment LED Displays (FD1642 / CT1642 driver ICs).
+  FD1642_TVReceiverDisplay.h - Advanced C++ Arduino Library for Salvaged 
+  TV Receiver & Set-Top Box LED Displays (FD1642 / CT1642 driver ICs).
 
+  Includes Alphanumeric Character Rendering, Text Scrolling, and Pre-built Animations.
   Copyright (c) 2026. Released under the MIT License.
 */
 
@@ -25,22 +26,14 @@ public:
    */
   void begin();
 
-  /**
-   * @brief Set all 4 digits simultaneously (0..9)
-   * 
-   * @param d1 Leftmost Digit
-   * @param d2 Middle-Left Digit
-   * @param d3 Middle-Right Digit
-   * @param d4 Rightmost Digit
-   */
+  // -------------------------------------------------------------------
+  // DIGIT & NUMBER SETTERS
+  // -------------------------------------------------------------------
+  
+  /** Set all 4 digits at once (0..9) */
   void showDigits(uint8_t d1, uint8_t d2, uint8_t d3, uint8_t d4);
 
-  /**
-   * @brief Set a single digit by index (0=Leftmost/Digit 1 ... 3=Rightmost/Digit 4)
-   * 
-   * @param index Digit index (0 to 3)
-   * @param value Number to display (0 to 9)
-   */
+  /** Set single digit by index (0=Leftmost, 3=Rightmost) */
   void setDigit(uint8_t index, uint8_t value);
 
   // Direct single-digit setters
@@ -49,39 +42,101 @@ public:
   void setDigit3(uint8_t value); // Middle-Right Digit
   void setDigit4(uint8_t value); // Rightmost Digit
 
-  /**
-   * @brief Set a 4-digit integer (0 to 9999)
-   * 
-   * @param value Integer value
-   */
+  /** Set 4-digit integer (0 to 9999) */
   void showNumber(uint16_t value);
 
-  /**
-   * @brief Set digital clock format HH:MM
-   * 
-   * @param hours Hours (0 to 99)
-   * @param minutes Minutes (0 to 59)
-   */
+  /** Set digital clock format HH:MM */
   void showClock(uint8_t hours, uint8_t minutes);
 
-  /**
-   * @brief Clear/turn off all segments
-   */
-  void clear();
+  // -------------------------------------------------------------------
+  // TEXT & ALPHANUMERIC CHARACTERS
+  // -------------------------------------------------------------------
 
   /**
-   * @brief Refresh the display. Call inside loop() or timer interrupt.
+   * @brief Display up to 4 characters on the display (e.g. "PLAY", "LOAD", "COOL", "OFF ")
+   * 
+   * @param str C-string with up to 4 characters
    */
+  void showString(const char* str);
+
+  /**
+   * @brief Set a single ASCII character at specified digit position
+   * 
+   * @param index Digit index (0 to 3)
+   * @param c ASCII character ('A'..'Z', '0'..'9', '-', '_', ' ')
+   */
+  void setChar(uint8_t index, char c);
+
+  /**
+   * @brief Scroll a string across the 4 digits (Blocking animation)
+   * 
+   * @param text Long text string to scroll
+   * @param speedMs Delay in milliseconds per scroll step (default: 250ms)
+   */
+  void scrollText(const char* text, uint16_t speedMs = 250);
+
+  // -------------------------------------------------------------------
+  // ANIMATIONS & LOADING SCREENS
+  // -------------------------------------------------------------------
+
+  /**
+   * @brief Rotating Ring Loading Animation (Clockwise segment spinner)
+   * 
+   * @param durationMs Total duration of loading animation in milliseconds
+   * @param speedMs Delay per rotation step in milliseconds (default: 80ms)
+   */
+  void animLoadingSpinner(uint16_t durationMs = 3000, uint16_t speedMs = 80);
+
+  /**
+   * @brief Chasing Outer Wave Animation (Circles the perimeter of digits)
+   * 
+   * @param cycles Number of full wave cycles
+   * @param speedMs Speed per step in milliseconds (default: 70ms)
+   */
+  void animWave(uint16_t cycles = 3, uint16_t speedMs = 70);
+
+  /**
+   * @brief Bouncing Dash / Dot Animation (Moves back and forth left-to-right)
+   * 
+   * @param bounces Number of bounces
+   * @param speedMs Speed per move in milliseconds (default: 100ms)
+   */
+  void animBounce(uint16_t bounces = 4, uint16_t speedMs = 100);
+
+  /**
+   * @brief Slot Machine Reel Roll Animation (Spins digits until landing on target)
+   * 
+   * @param targetNumber Number to land on (0 to 9999)
+   * @param durationMs Duration of roll in milliseconds (default: 2000ms)
+   */
+  void animSlotMachine(uint16_t targetNumber, uint16_t durationMs = 2000);
+
+  /**
+   * @brief Fill & Wipe Animation (Fills left-to-right, clears left-to-right)
+   * 
+   * @param speedMs Delay per column in milliseconds (default: 150ms)
+   */
+  void animFillWipe(uint16_t speedMs = 150);
+
+  // -------------------------------------------------------------------
+  // SYSTEM UTILITIES
+  // -------------------------------------------------------------------
+
+  /** Clear/turn off all segments */
+  void clear();
+
+  /** Refresh the display multiplexer. Must be called repeatedly in loop(). */
   void refresh();
 
 private:
   uint8_t _clkPin;
   uint8_t _dataPin;
-  uint8_t _digits[4];
+  uint32_t _rawFrames[4]; // Raw 18-bit segment frames for 4 digits
 
   void startCondition();
   void stopCondition();
   void send18BitData(uint32_t data);
+  uint32_t getCharPattern(char c);
 };
 
 // Alias for backwards compatibility

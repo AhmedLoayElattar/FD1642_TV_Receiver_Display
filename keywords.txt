@@ -22,6 +22,14 @@ setDigit3	KEYWORD2
 setDigit4	KEYWORD2
 showNumber	KEYWORD2
 showClock	KEYWORD2
+showString	KEYWORD2
+setChar	KEYWORD2
+scrollText	KEYWORD2
+animLoadingSpinner	KEYWORD2
+animWave	KEYWORD2
+animBounce	KEYWORD2
+animSlotMachine	KEYWORD2
+animFillWipe	KEYWORD2
 clear	KEYWORD2
 refresh	KEYWORD2
 
