@@ -78,7 +78,7 @@ void FD1642_TVReceiverDisplay::send18BitData(uint32_t data) {
 }
 
 // -------------------------------------------------------------------
-// ASCII / Symbol Pattern Generator
+// Complete Alphanumeric & ASCII Symbol Pattern Generator (A-Z, 0-9)
 // -------------------------------------------------------------------
 uint32_t FD1642_TVReceiverDisplay::getCharPattern(char c) {
   if (c >= '0' && c <= '9') {
@@ -101,7 +101,9 @@ uint32_t FD1642_TVReceiverDisplay::getCharPattern(char c) {
     case 'H': return SEG_B | SEG_C | SEG_E | SEG_F | SEG_G;
     case 'I': return SEG_B | SEG_C;
     case 'J': return SEG_B | SEG_C | SEG_D | SEG_E;
+    case 'K': return SEG_A | SEG_C | SEG_E | SEG_F | SEG_G;
     case 'L': return SEG_D | SEG_E | SEG_F;
+    case 'M': return SEG_A | SEG_C | SEG_E;
     case 'N': return SEG_C | SEG_E | SEG_G; // 'n'
     case 'O': return SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F;
     case 'P': return SEG_A | SEG_B | SEG_E | SEG_F | SEG_G;
@@ -110,6 +112,9 @@ uint32_t FD1642_TVReceiverDisplay::getCharPattern(char c) {
     case 'S': return SEG_A | SEG_C | SEG_D | SEG_F | SEG_G;
     case 'T': return SEG_D | SEG_E | SEG_F | SEG_G; // 't'
     case 'U': return SEG_B | SEG_C | SEG_D | SEG_E | SEG_F;
+    case 'V': return SEG_C | SEG_D | SEG_E; // 'v'
+    case 'W': return SEG_B | SEG_C | SEG_D | SEG_E | SEG_F; // 'W' (rendered as U-shaped 7-segment font)
+    case 'X': return SEG_B | SEG_C | SEG_E | SEG_F | SEG_G;
     case 'Y': return SEG_B | SEG_C | SEG_D | SEG_F | SEG_G;
     case 'Z': return SEG_A | SEG_B | SEG_D | SEG_E | SEG_G;
     case '-': return SEG_G;
@@ -217,7 +222,6 @@ void FD1642_TVReceiverDisplay::animLoadingSpinner(uint16_t durationMs, uint16_t 
 
 // Chasing Outer Wave Animation
 void FD1642_TVReceiverDisplay::animWave(uint16_t cycles, uint16_t speedMs) {
-  // Wave path: Top across (D1_A, D2_A, D3_A, D4_A), Down D4 (D4_B, D4_C), Bottom across (D4_D, D3_D, D2_D, D1_D), Up D1 (D1_E, D1_F)
   struct WaveStep { uint8_t digit; uint32_t seg; };
   WaveStep path[] = {
     {0, SEG_A}, {1, SEG_A}, {2, SEG_A}, {3, SEG_A},
